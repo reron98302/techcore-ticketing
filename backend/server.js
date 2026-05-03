@@ -27,7 +27,7 @@ app.use(session({
   }
 }));
 
-// Serve frontend files from the public folder (copied during build)
+// Serve static frontend files (../frontend relative to backend __dirname)
 app.use(express.static(path.join(__dirname, '../frontend')));
 // ---- API Routes ----
 app.use('/api/auth',    authRoutes);
