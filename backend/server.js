@@ -27,8 +27,8 @@ app.use(session({
   }
 }));
 
-// Serve frontend files from the frontend folder
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Serve frontend files from the public folder (copied during build)
+app.use(express.static(path.join(__dirname, './public')));
 
 // ---- API Routes ----
 app.use('/api/auth',    authRoutes);
@@ -37,7 +37,7 @@ app.use('/api/admin',   adminRoutes);
 
 // ---- Catch-all: serve frontend for any non-API route ----
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/login.html'));
+  res.sendFile(path.join(__dirname, './public/login.html'));
 });
 
 // ---- Start server ----
