@@ -10,7 +10,7 @@ const ticketRoutes = require('./routes/tickets');
 const adminRoutes  = require('./routes/admin');
 
 const app  = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // ---- Middleware ----
 app.use(express.json());
@@ -27,8 +27,8 @@ app.use(session({
   }
 }));
 
-// Serve static frontend files (../frontend relative to backend __dirname)
-app.use(express.static(path.join(__dirname, '../frontend')));
+// Serve static frontend files (./frontend relative to backend __dirname)
+app.use(express.static(path.join(__dirname, 'frontend')));
 // ---- API Routes ----
 app.use('/api/auth',    authRoutes);
 app.use('/api/tickets', ticketRoutes);
@@ -36,7 +36,7 @@ app.use('/api/admin',   adminRoutes);
 
 // ---- Catch-all: serve frontend for any non-API route ----
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend/login.html'));});
+    res.sendFile(path.join(__dirname, 'frontend/login.html'));});
 
 // ---- Start server ----
 app.listen(PORT, () => {
