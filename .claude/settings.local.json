@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"const bcrypt=require\\('bcrypt'\\); \\(async\\(\\)=>{ const h=await bcrypt.hash\\('Password1!',10\\); console.log\\(h\\); }\\)\\(\\)\")",
+      "Bash(npm install *)",
+      "Bash(node -e ' *)",
+      "Bash(npm start *)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/api/auth/me)",
+      "Read(//c/Users/ReRon/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/5ffa5f6c-bb94-472d-84b4-a45e60a554cf/aa5445b7-ced5-4c32-a4a0-f6badc5e7274/skills/docx/**)",
+      "Bash(pandoc \"C:\\\\Users\\\\ReRon\\\\OneDrive\\\\Documents\\\\My School Documents\\\\_2026_Spring_Courses\\\\ITEC4750_Senior_Capstone_Spr26\\\\Report 2 - IS Design and Development.docx\" -t plain)",
+      "Bash(python scripts/office/unpack.py \"C:\\\\Users\\\\ReRon\\\\OneDrive\\\\Documents\\\\My School Documents\\\\_2026_Spring_Courses\\\\ITEC4750_Senior_Capstone_Spr26\\\\Report 2 - IS Design and Development.docx\" /tmp/report2_unpacked/)",
+      "Bash(cd /tmp)",
+      "Bash(cp \"C:\\\\Users\\\\ReRon\\\\OneDrive\\\\Documents\\\\My School Documents\\\\_2026_Spring_Courses\\\\ITEC4750_Senior_Capstone_Spr26\\\\Report 2 - IS Design and Development.docx\" report2.docx)",
+      "Bash(unzip -o report2.docx word/document.xml -d report2_extracted)",
+      "Bash(grep -v '^$')",
+      "Bash(pkill -f \"node server.js\")",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/register -H 'Content-Type: application/json' -d '{\"username\":\"test.user\",\"full_name\":\"Test User\",\"email\":\"test@techcore.com\",\"password\":\"Password1!\"}')",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -u root -pSnap6507 -e \"DROP DATABASE IF EXISTS techcore_ticketing;\")",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -u root -pSnap6507)",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -u root -pSnap6507 techcore_ticketing -e \"SELECT username, email, role FROM users; SELECT ticket_id, title, priority FROM tickets;\")",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -u root -pSnap6507 techcore_ticketing -e \"SELECT username, full_name, role FROM users ORDER BY role, full_name;\")",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"Password1!\"}')",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H \"Content-Type: application/json\" -d '{\"username\":\"ronald.robertson\",\"password\":\"Password1!\"}')",
+      "Bash(git init *)",
+      "Bash(git add *)",
+      "Bash(git config *)",
+      "Bash(git commit -m 'Initial commit - TechCore IT Ticketing System *)"
+    ]
+  }
+}

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechCore IT - Submit Ticket</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">TechCore IT Ticketing System</div>
+    <div class="nav-right">
+      <span id="user-greeting"></span>
+      <a href="dashboard.html" class="btn btn-outline btn-sm">Back to Dashboard</a>
+      <a href="admin.html" id="admin-link" class="btn btn-outline btn-sm hidden">Admin Panel</a>
+      <button id="logout-btn" class="btn btn-outline btn-sm">Log Out</button>
+    </div>
+  </nav>
+
+  <main class="container container-sm">
+    <div class="page-header">
+      <h2>Submit a New Ticket</h2>
+      <p class="page-sub">Fill out the form below to report an IT issue.</p>
+    </div>
+
+    <form id="ticket-form" class="card">
+      <div class="form-group">
+        <label for="title">Title <span class="required">*</span></label>
+        <input type="text" id="title" name="title"
+               placeholder="Brief summary of the issue" required maxlength="255" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="category">Category <span class="required">*</span></label>
+          <select id="category" name="category" required>
+            <option value="">Select a category</option>
+            <option value="Hardware">Hardware</option>
+            <option value="Software">Software</option>
+            <option value="Network">Network</option>
+            <option value="Account">Account</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="priority">Priority <span class="required">*</span></label>
+          <select id="priority" name="priority" required>
+            <option value="">Select a priority</option>
+            <option value="Low">Low</option>
+            <option value="Medium" selected>Medium</option>
+            <option value="High">High</option>
+            <option value="Critical">Critical</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="description">Description <span class="required">*</span></label>
+        <textarea id="description" name="description" rows="6"
+                  placeholder="Describe the issue in detail. Include when it started, what you were doing, and any error messages you saw."
+                  required></textarea>
+      </div>
+
+      <div id="form-error" class="error-msg hidden"></div>
+      <div id="form-success" class="success-msg hidden"></div>
+
+      <div class="form-actions">
+        <a href="dashboard.html" class="btn btn-outline">Cancel</a>
+        <button type="submit" class="btn btn-primary">Submit Ticket</button>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    // TR: redirect to login if session expired
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.user) { window.location.href = 'login.html'; return; }
+        document.getElementById('user-greeting').textContent = `Hello, ${data.user.full_name}`;
+        if (data.user.role === 'admin') {
+          document.getElementById('admin-link').classList.remove('hidden');
+        }
+      }).catch(() => window.location.href = 'login.html');
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = 'login.html';
+    });
+
+    document.getElementById('ticket-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorEl   = document.getElementById('form-error');
+      const successEl = document.getElementById('form-success');
+      errorEl.classList.add('hidden');
+      successEl.classList.add('hidden');
+
+      const body = {
+        title:       document.getElementById('title').value.trim(),
+        category:    document.getElementById('category').value,
+        priority:    document.getElementById('priority').value,
+        description: document.getElementById('description').value.trim()
+      };
+
+      try {
+        const res  = await fetch('/api/tickets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (res.ok) {
+          successEl.textContent = `Ticket #${data.ticket_id} submitted successfully.`;
+          successEl.classList.remove('hidden');
+          document.getElementById('ticket-form').reset();
+          setTimeout(() => window.location.href = 'dashboard.html', 1500);
+        } else {
+          errorEl.textContent = data.error || 'Failed to submit ticket.';
+          errorEl.classList.remove('hidden');
+        }
+      } catch (err) {
+        errorEl.textContent = 'Could not connect to server.';
+        errorEl.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

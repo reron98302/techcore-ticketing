@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechCore IT - User Management</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">TechCore IT Ticketing System</div>
+    <div class="nav-right">
+      <span id="user-greeting"></span>
+      <span id="user-role-badge" class="role-badge"></span>
+      <a href="dashboard.html" class="btn btn-outline btn-sm">Dashboard</a>
+      <button id="logout-btn" class="btn btn-outline btn-sm">Log Out</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h2>User Management</h2>
+      <p class="page-sub">Manage roles and account status for all users.</p>
+    </div>
+
+    <div id="users-container">
+      <p class="loading">Loading users...</p>
+    </div>
+  </main>
+
+  <!-- Edit User Modal -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-content" style="max-width:420px;">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <h3 id="modal-title">Edit User</h3>
+
+      <div class="form-group" style="margin-top:16px;">
+        <label>Role</label>
+        <select id="edit-role" class="filter-select" style="width:100%;">
+          <option value="user">User</option>
+          <option value="it_staff">IT Staff</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Account Status</label>
+        <select id="edit-status" class="filter-select" style="width:100%;">
+          <option value="1">Active</option>
+          <option value="0">Deactivated</option>
+        </select>
+      </div>
+
+      <div id="modal-msg" class="hidden" style="margin-top:8px;"></div>
+
+      <div class="form-actions">
+        <button class="btn btn-outline" id="cancel-btn" style="color:#333;border-color:#ccc;">Cancel</button>
+        <button class="btn btn-primary" id="save-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let editingUserId = null;
+
+    async function init() {
+      try {
+        const res  = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (!res.ok || !data.user) { window.location.href = 'login.html'; return; }
+        if (data.user.role !== 'admin') { window.location.href = 'dashboard.html'; return; }
+
+        currentUser = data.user;
+        document.getElementById('user-greeting').textContent = `Hello, ${currentUser.full_name}`;
+        const badge = document.getElementById('user-role-badge');
+        badge.textContent = 'ADMIN';
+        badge.classList.add('role-admin');
+
+        loadUsers();
+      } catch (e) {
+        window.location.href = 'login.html';
+      }
+    }
+
+    async function loadUsers() {
+      try {
+        const res  = await fetch('/api/admin/users');
+        const data = await res.json();
+        renderUsers(data.users || []);
+      } catch (e) {
+        document.getElementById('users-container').innerHTML = '<p class="error-msg">Could not load users.</p>';
+      }
+    }
+
+    function renderUsers(users) {
+      const container = document.getElementById('users-container');
+
+      const rows = users.map(u => `
+        <tr>
+          <td>${u.user_id}</td>
+          <td>${escHtml(u.full_name)}</td>
+          <td>${escHtml(u.username)}</td>
+          <td>${escHtml(u.email)}</td>
+          <td><span class="badge role-badge role-${u.role}">${u.role.replace('_',' ').toUpperCase()}</span></td>
+          <td><span class="badge ${u.is_active ? 'status-resolved' : 'status-closed'}">${u.is_active ? 'Active' : 'Inactive'}</span></td>
+          <td>${new Date(u.created_at).toLocaleDateString()}</td>
+          <td>
+            ${u.user_id !== currentUser.user_id
+              ? `<button class="btn btn-primary btn-sm" onclick="openEdit(${u.user_id}, '${escHtml(u.full_name)}', '${u.role}', ${u.is_active})">Edit</button>`
+              : '<span style="color:#aaa;font-size:12px;">You</span>'}
+          </td>
+        </tr>`).join('');
+
+      container.innerHTML = `
+        <table class="ticket-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Full Name</th><th>Username</th><th>Email</th>
+              <th>Role</th><th>Status</th><th>Joined</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }
+
+    function openEdit(userId, fullName, role, isActive) {
+      editingUserId = userId;
+      document.getElementById('modal-title').textContent = `Edit: ${fullName}`;
+      document.getElementById('edit-role').value   = role;
+      document.getElementById('edit-status').value = isActive ? '1' : '0';
+      document.getElementById('modal-msg').className = 'hidden';
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      const role     = document.getElementById('edit-role').value;
+      const isActive = document.getElementById('edit-status').value === '1';
+      const msg      = document.getElementById('modal-msg');
+
+      try {
+        const [roleRes, statusRes] = await Promise.all([
+          fetch(`/api/admin/users/${editingUserId}/role`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role })
+          }),
+          fetch(`/api/admin/users/${editingUserId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: isActive })
+          })
+        ]);
+
+        const roleData   = await roleRes.json();
+        const statusData = await statusRes.json();
+
+        if (roleRes.ok && statusRes.ok) {
+          msg.textContent = 'Changes saved.';
+          msg.className   = 'success-msg';
+          loadUsers();
+          setTimeout(() => document.getElementById('edit-modal').classList.add('hidden'), 1000);
+        } else {
+          msg.textContent = roleData.error || statusData.error || 'Error saving changes.';
+          msg.className   = 'error-msg';
+        }
+      } catch (e) {
+        document.getElementById('modal-msg').textContent = 'Could not connect to server.';
+        document.getElementById('modal-msg').className   = 'error-msg';
+      }
+    });
+
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('edit-modal').classList.add('hidden');
+    });
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+      document.getElementById('edit-modal').classList.add('hidden');
+    });
+    document.getElementById('edit-modal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('edit-modal'))
+        document.getElementById('edit-modal').classList.add('hidden');
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = 'login.html';
+    });
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    init();
+  </script>
+</body>
+</html>

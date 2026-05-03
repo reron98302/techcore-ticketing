@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechCore IT - Dashboard</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">TechCore IT Ticketing System</div>
+    <div class="nav-right">
+      <span id="user-greeting"></span>
+      <span id="user-role-badge" class="role-badge"></span>
+      <a href="submit-ticket.html" class="btn btn-primary btn-sm">+ New Ticket</a>
+      <a href="admin.html" id="admin-link" class="btn btn-outline btn-sm hidden">Admin Panel</a>
+      <button id="logout-btn" class="btn btn-outline btn-sm">Log Out</button>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h2 id="page-title">My Tickets</h2>
+      <div class="filters" id="filter-bar">
+        <select id="filter-status" class="filter-select">
+          <option value="">All Statuses</option>
+          <option value="Open">Open</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Resolved">Resolved</option>
+          <option value="Closed">Closed</option>
+        </select>
+        <select id="filter-priority" class="filter-select">
+          <option value="">All Priorities</option>
+          <option value="Critical">Critical</option>
+          <option value="High">High</option>
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="tickets-container">
+      <p class="loading">Loading tickets...</p>
+    </div>
+  </main>
+
+  <!-- Ticket Detail Modal -->
+  <div id="ticket-modal" class="modal hidden">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    // TR: dashboard handles both regular users and staff/admin in one page
+    let currentUser = null;
+    let allTickets  = [];
+    let staffList   = [];
+
+    // Check login
+    async function init() {
+      try {
+        const res  = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (!res.ok || !data.user) {
+          window.location.href = 'login.html';
+          return;
+        }
+        currentUser = data.user;
+        document.getElementById('user-greeting').textContent = `Hello, ${currentUser.full_name}`;
+        const badge = document.getElementById('user-role-badge');
+        badge.textContent = currentUser.role.replace('_', ' ').toUpperCase();
+        badge.classList.add(`role-${currentUser.role}`);
+        if (currentUser.role !== 'user') {
+          document.getElementById('page-title').textContent = 'All Tickets';
+          loadStaff();
+        }
+        if (currentUser.role === 'admin') {
+          document.getElementById('admin-link').classList.remove('hidden');
+        }
+        loadTickets();
+      } catch (e) {
+        window.location.href = 'login.html';
+      }
+    }
+
+    async function loadStaff() {
+      try {
+        const res  = await fetch('/api/tickets/meta/staff');
+        const data = await res.json();
+        staffList = data.staff || [];
+      } catch (e) {}
+    }
+
+    async function loadTickets() {
+      try {
+        const res  = await fetch('/api/tickets');
+        const data = await res.json();
+        allTickets = data.tickets || [];
+        if (currentUser.role === 'user') {
+          renderTickets(allTickets);
+        } else {
+          renderStaffView(allTickets);
+        }
+      } catch (e) {
+        document.getElementById('tickets-container').innerHTML = '<p class="error-msg">Could not load tickets.</p>';
+      }
+    }
+
+    // TR: two-column view for staff per section 3.3.2 of report
+    // left = tickets assigned to me, right = unassigned or assigned to others
+    function renderStaffView(tickets) {
+      const container = document.getElementById('tickets-container');
+      const myTickets    = tickets.filter(t => t.assigned_to === currentUser.user_id);
+      const otherTickets = tickets.filter(t => t.assigned_to !== currentUser.user_id);
+
+      container.innerHTML = `
+        <div class="staff-columns">
+          <div class="staff-col">
+            <div class="staff-col-header">My Tickets <span class="col-count">${myTickets.length}</span></div>
+            <div id="my-tickets-list">${myTickets.length ? myTickets.map(ticketCard).join('') : '<p class="empty-col">No tickets assigned to you.</p>'}</div>
+          </div>
+          <div class="staff-col">
+            <div class="staff-col-header">Other Tickets <span class="col-count">${otherTickets.length}</span></div>
+            <div id="other-tickets-list">${otherTickets.length ? otherTickets.map(ticketCard).join('') : '<p class="empty-col">No other tickets.</p>'}</div>
+          </div>
+        </div>`;
+
+      container.querySelectorAll('.ticket-card').forEach(card => {
+        card.addEventListener('click', () => openTicket(card.dataset.id));
+      });
+    }
+
+    // TR: color coded badges based on priority per section 3.3.1
+    function ticketCard(t) {
+      return `
+        <div class="ticket-card" data-id="${t.ticket_id}">
+          <div class="card-top">
+            <span class="card-id">#${t.ticket_id}</span>
+            <span class="badge priority-${t.priority.toLowerCase()}">${t.priority}</span>
+            <span class="badge status-${t.status_name.toLowerCase().replace(' ', '-')}">${t.status_name}</span>
+          </div>
+          <div class="card-title">${escHtml(t.title)}</div>
+          <div class="card-meta">
+            <span class="badge category-badge">${t.category}</span>
+            <span class="card-sub">By ${escHtml(t.submitted_by_name)}</span>
+            <span class="card-sub">${new Date(t.created_at).toLocaleDateString()}</span>
+          </div>
+          ${t.assigned_to_name ? `<div class="card-assigned">Assigned: ${escHtml(t.assigned_to_name)}</div>` : '<div class="card-assigned unassigned">Unassigned</div>'}
+        </div>`;
+    }
+
+    function renderTickets(tickets) {
+      const container = document.getElementById('tickets-container');
+      if (tickets.length === 0) {
+        container.innerHTML = '<p class="empty-state">No tickets found.</p>';
+        return;
+      }
+
+      const rows = tickets.map(t => `
+        <tr class="ticket-row" data-id="${t.ticket_id}">
+          <td>#${t.ticket_id}</td>
+          <td>${escHtml(t.title)}</td>
+          <td><span class="badge category-badge">${t.category}</span></td>
+          <td><span class="badge priority-${t.priority.toLowerCase()}">${t.priority}</span></td>
+          <td><span class="badge status-${t.status_name.toLowerCase().replace(' ','-')}">${t.status_name}</span></td>
+          <td>${escHtml(t.submitted_by_name)}</td>
+          <td>${t.assigned_to_name ? escHtml(t.assigned_to_name) : '<span class="unassigned">Unassigned</span>'}</td>
+          <td>${new Date(t.created_at).toLocaleDateString()}</td>
+        </tr>`).join('');
+
+      container.innerHTML = `
+        <table class="ticket-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Category</th>
+              <th>Priority</th><th>Status</th><th>Submitted By</th>
+              <th>Assigned To</th><th>Date</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+
+      document.querySelectorAll('.ticket-row').forEach(row => {
+        row.addEventListener('click', () => openTicket(row.dataset.id));
+      });
+    }
+
+    async function openTicket(id) {
+      try {
+        const res  = await fetch(`/api/tickets/${id}`);
+        const data = await res.json();
+        if (!res.ok) return;
+        showModal(data.ticket, data.logs);
+      } catch (e) {}
+    }
+
+    function showModal(ticket, logs) {
+      const canManage = currentUser.role === 'it_staff' || currentUser.role === 'admin';
+      const statusOptions = ['Open','In Progress','Resolved','Closed'].map(s =>
+        `<option value="${s}" ${ticket.status_name === s ? 'selected' : ''}>${s}</option>`
+      ).join('');
+
+      const logRows = logs.map(l => {
+        if (l.note) {
+          return `<tr class="log-note-row">
+            <td>${new Date(l.logged_at).toLocaleString()}</td>
+            <td>${escHtml(l.full_name)}</td>
+            <td><span class="note-label">Note:</span> ${escHtml(l.note)}</td>
+          </tr>`;
+        }
+        return `<tr><td>${new Date(l.logged_at).toLocaleString()}</td><td>${escHtml(l.full_name)}</td><td>${escHtml(l.action)}</td></tr>`;
+      }).join('');
+
+      document.getElementById('modal-body').innerHTML = `
+        <h3>Ticket #${ticket.ticket_id}: ${escHtml(ticket.title)}</h3>
+        <div class="ticket-detail-grid">
+          <div><strong>Category:</strong> ${ticket.category}</div>
+          <div><strong>Priority:</strong> <span class="badge priority-${ticket.priority.toLowerCase()}">${ticket.priority}</span></div>
+          <div><strong>Status:</strong> <span class="badge status-${ticket.status_name.toLowerCase().replace(' ','-')}">${ticket.status_name}</span></div>
+          <div><strong>Submitted By:</strong> ${escHtml(ticket.submitted_by_name)}</div>
+          <div><strong>Assigned To:</strong> ${ticket.assigned_to_name || 'Unassigned'}</div>
+          <div><strong>Submitted:</strong> ${new Date(ticket.created_at).toLocaleString()}</div>
+        </div>
+        <div class="detail-section">
+          <strong>Description:</strong>
+          <p>${escHtml(ticket.description)}</p>
+        </div>
+        ${canManage ? `
+        <div class="detail-section admin-controls">
+          <strong>Update Status:</strong>
+          <div class="control-row">
+            <select id="new-status" class="filter-select">
+              ${statusOptions}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="updateStatus(${ticket.ticket_id})">Update</button>
+          </div>
+          <strong style="display:block;margin-top:12px;">Assign To:</strong>
+          <div class="control-row">
+            <select id="new-assignee" class="filter-select">
+              <option value="">— Unassigned —</option>
+              ${staffList.map(s => `<option value="${s.user_id}" ${ticket.assigned_to === s.user_id ? 'selected' : ''}>${escHtml(s.full_name)}</option>`).join('')}
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="assignTicket(${ticket.ticket_id})">Assign</button>
+          </div>
+        </div>` : ''}
+        <div class="detail-section">
+          <strong>Activity Log:</strong>
+          <table class="log-table">
+            <thead><tr><th>Time</th><th>User</th><th>Action / Note</th></tr></thead>
+            <tbody>${logRows}</tbody>
+          </table>
+        </div>
+        <div class="detail-section">
+          <strong>Add a Note:</strong>
+          <textarea id="note-input" rows="3" placeholder="Type a note about this ticket..." style="width:100%;margin-top:6px;padding:8px;border:1px solid #ddd;border-radius:4px;font-size:13px;font-family:inherit;resize:vertical;"></textarea>
+          <div style="margin-top:6px;">
+            <button class="btn btn-primary btn-sm" onclick="addNote(${ticket.ticket_id})">Add Note</button>
+          </div>
+        </div>
+        <div id="modal-msg" class="hidden"></div>`;
+
+      document.getElementById('ticket-modal').classList.remove('hidden');
+    }
+
+    async function addNote(ticketId) {
+      const note = document.getElementById('note-input').value.trim();
+      const msg  = document.getElementById('modal-msg');
+
+      if (!note) {
+        msg.textContent = 'Note cannot be empty.';
+        msg.className   = 'error-msg';
+        return;
+      }
+
+      try {
+        const res  = await fetch(`/api/tickets/${ticketId}/note`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note })
+        });
+        const data = await res.json();
+        msg.textContent = data.message || data.error;
+        msg.className   = res.ok ? 'success-msg' : 'error-msg';
+        if (res.ok) {
+          document.getElementById('note-input').value = '';
+          openTicket(ticketId);
+        }
+      } catch (e) {
+        msg.textContent = 'Error adding note.';
+        msg.className   = 'error-msg';
+      }
+    }
+
+    async function assignTicket(ticketId) {
+      const assignedTo = document.getElementById('new-assignee').value;
+      const msg        = document.getElementById('modal-msg');
+      if (!assignedTo) return;
+
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}/assign`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ assigned_to: parseInt(assignedTo) })
+        });
+        const data = await res.json();
+        msg.textContent = data.message || data.error;
+        msg.className   = res.ok ? 'success-msg' : 'error-msg';
+        if (res.ok) loadTickets();
+      } catch (e) {
+        msg.textContent = 'Error assigning ticket.';
+        msg.className   = 'error-msg';
+      }
+    }
+
+    async function updateStatus(ticketId) {
+      const statusName = document.getElementById('new-status').value;
+      const statusMap  = { 'Open': 1, 'In Progress': 2, 'Resolved': 3, 'Closed': 4 };
+      const statusId   = statusMap[statusName];
+      const msg        = document.getElementById('modal-msg');
+
+      try {
+        const res = await fetch(`/api/tickets/${ticketId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status_id: statusId })
+        });
+        const data = await res.json();
+        msg.textContent = data.message || data.error;
+        msg.className   = res.ok ? 'success-msg' : 'error-msg';
+        if (res.ok) loadTickets();
+      } catch (e) {
+        msg.textContent = 'Error updating ticket.';
+        msg.className   = 'error-msg';
+      }
+    }
+
+    // Filters
+    document.getElementById('filter-status').addEventListener('change', applyFilters);
+    document.getElementById('filter-priority').addEventListener('change', applyFilters);
+    function applyFilters() {
+      const status   = document.getElementById('filter-status').value;
+      const priority = document.getElementById('filter-priority').value;
+      let filtered   = allTickets;
+      if (status)   filtered = filtered.filter(t => t.status_name === status);
+      if (priority) filtered = filtered.filter(t => t.priority === priority);
+      if (currentUser.role === 'user') {
+        renderTickets(filtered);
+      } else {
+        renderStaffView(filtered);
+      }
+    }
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.href = 'login.html';
+    });
+
+    // Close modal
+    document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('ticket-modal').classList.add('hidden');
+    });
+    document.getElementById('ticket-modal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('ticket-modal')) {
+        document.getElementById('ticket-modal').classList.add('hidden');
+      }
+    });
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    init();
+  </script>
+</body>
+</html>
