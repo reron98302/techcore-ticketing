@@ -2,10 +2,10 @@ FROM node:22
 
 WORKDIR /app
 
-# Copy frontend from repo root — must come after backend files
+# Copy frontend from repo root - must come after backend files
 # to avoid being overwritten by a broad backend/ copy
 COPY backend/package.json backend/package-lock.json ./
-COPY backend/server.js backend/seed.js ./
+COPY backend/server.js backend/seed.js backend/init-db.js ./
 COPY backend/config/ ./config/
 COPY backend/middleware/ ./middleware/
 COPY backend/routes/ ./routes/
