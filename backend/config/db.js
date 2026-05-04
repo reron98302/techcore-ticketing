@@ -3,18 +3,20 @@
 const mysql = require('mysql2');
 
 const db = mysql.createConnection({
-  host:     process.env.DB_HOST     || 'localhost',
-  user:     process.env.DB_USER     || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME     || 'techcore_ticketing'
+    host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
+    port: process.env.DB_PORT || process.env.MYSQLPORT || 3306,
+    user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+    password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '',
+    database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'techcore_ticketing',
+    multipleStatements: true
 });
 
 db.connect((err) => {
-  if (err) {
-    console.error('MySQL connection error:', err.message);
-    process.exit(1);
-  }
-  console.log('Connected to MySQL database.');
+    if (err) {
+          console.error('MySQL connection error:', err.message);
+          process.exit(1);
+    }
+    console.log('Connected to MySQL database.');
 });
 
 module.exports = db;
